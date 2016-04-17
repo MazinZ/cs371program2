@@ -3,13 +3,16 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 using namespace std;
 
 string longToDottedIP(long ip);
 vector<string> parser(string s);
-
-
+bool matchesPrefix(string prefix, string ipAdd);
+long reverseLong(long num);
 
 struct line1 {
 	unsigned char a;
@@ -56,7 +59,6 @@ class tableEntry{
 
 
 
-
 tableEntry::tableEntry(string soIP, string nM, string nH){
 	sourceIP = soIP;
 	netMask = nM;
@@ -89,6 +91,7 @@ class Trie
 		Node *root;
 	public: 
 		string matchingPrefix;
+		vector<string> matchingPrefixes;
 
 		Trie() 
 		{ 
@@ -179,7 +182,8 @@ int main(int argc, char *argv[]) {
 
 	fread(&sourceIP, 4, 1, fp);
 	fread(&destIP, 4, 1, fp);
-
+	sourceIP = htonl(sourceIP);
+	destIP = htonl(destIP);
 	
 	char *data;
 	data = NULL;
@@ -192,17 +196,40 @@ int main(int argc, char *argv[]) {
 	routingTable.open("./routing_table.txt", ifstream::in);
 	string line;
 	vector<tableEntry> routingEntries;
-	Trie prefixtree;
+	//Trie prefixtree;
 	while (getline(routingTable, line))
 	{
+		
 		vector<string> parsed;
 		parsed = parser(line);
 		tableEntry newTableEntry(parsed[0], parsed[1], parsed[2]);
 		routingEntries.push_back(newTableEntry);
-		prefixtree.insert(parsed[0]);
+		//prefixtree.insert(parsed[0].substr(0, parsed[0].find_first_of(".0")+1));
 	}
 	routingTable.close();
 	
+	int matchCounter = 0;
+	
+	//cout << "TESTING: " << longToDottedIP(destIP) << endl;
+	//prefixtree.search("137.34");
+	long currSmallest = reverseLong(inet_addr(routingEntries[0].getSourceIP().c_str())) ^ destIP;
+	
+	
+	for (int i = 0; i <routingEntries.size()-1; i++) {
+		//long testValue = reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str())) ^ destIP & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str()));
+		long testValue = reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) ^ destIP & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str()));
+		cout << endl;
+		cout << reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) << endl;
+		cout << reverseLong(inet_addr(routingEntries[i].getnetMask().c_str())) << endl;
+		cout << destIP << endl;
+		
+		cout << "testval: " << testValue << endl;
+		if (testValue ==0){
+			matchCounter+=1;
+			
+			cout << "Matching: " << routingEntries[i].getSourceIP() << endl;
+		}
+	}
 	
 	
 	/*						OUTPUT FILE 							*/
@@ -219,29 +246,20 @@ int main(int argc, char *argv[]) {
 	}
 	
 	
+	/*long checksumArray[10] = [(x.a << 8) | (x.b), 
+	(x.c << 8) | (x.d), 
+	htons((y.a)), 
+	(y.b << 8) | (y.b), 
+	(z.a << 8) | (z.b),
+	htons((z.c)),
+	sourceIP & 0xffff0000) >> 16,
+	(sourceIP & 0x0000ffff),
+	(destIP & 0xffff0000) >> 16,
+	(destIP & 0x0000ffff)
+	];*/
 	
 	
-	/*																*/
-	/*short mynum = x.a & 0xFFFF;
-	short mynum2 = (x.a & 0x0000FFFF) >> 16;
-	short mynum3 = y.a & 0xFFFF;
-	short mynum4 = (y.a & 0x0000FFFF) >> 16;
-	short mynum5 = (z.a & 0xFFFF);
-	short mynum6 = (z.a & 0x0000FFFF) >> 16;
-	short mynum7 = sourceIP & 0xFFFF;
-	short mynum8 = (sourceIP & 0x0000FFFF) >> 16;
-	short mynum9 = destIP & 0xFFFF;
-	short mynum10 = (destIP & 0x0000FFFF) >> 16;*/
 	
-	//if(sum1 >= 65536);
-	
-	
-	//01000101 000000000
-	//00000000 000000000
-//	sourceIP = (sourceIP>>16) | (sourceIP<<16);
-	//destIP = (destIP>>16) | (destIP<<16);
-	sourceIP = htonl(sourceIP);
-	destIP = htonl(destIP);
 	
 	long mynum = (x.a << 8) | (x.b);
 	long mynum2 = (x.c << 8) | (x.d);
@@ -298,8 +316,8 @@ int main(int argc, char *argv[]) {
 	cout << checksum << endl;
 	cout << "SourceIP " << longToDottedIP(sourceIP) << endl;
 	cout << "DestIP " << longToDottedIP(destIP) << endl;
-	prefixtree.search(longToDottedIP(destIP));
-	cout << "Longest Matching: " << prefixtree.matchingPrefix << endl;
+
+	//cout << "Longest Matching: " << prefixtree.matchingPrefix << endl;
 	
 	
 	
@@ -332,4 +350,20 @@ vector<string> parser(string s) {
 	return parsed;
 }
 
+
+/*bool matchesPrefix(string prefix, string ipAdd) {
+	
+	
+}
+*/
+long reverseLong(long num){
+	long swapped = ((num>>24)&0xff) | // move byte 3 to byte 0
+	((num<<8)&0xff0000) | // move byte 1 to byte 2
+	((num>>8)&0xff00) | // move byte 2 to byte 1
+	((num<<24)&0xff000000);
+	
+	return swapped;
+	/* Source: http://stackoverflow.com/questions/2182002/convert-big-endian-to-little-endian-in-c-without-using-provided-func */
+	
+}
 
