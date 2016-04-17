@@ -14,6 +14,7 @@ vector<string> parser(string s);
 bool matchesPrefix(string prefix, string ipAdd);
 long reverseLong(long num);
 
+
 struct line1 {
 	unsigned char a;
 	unsigned char b;
@@ -22,7 +23,7 @@ struct line1 {
 };
 
 struct line2 {
-	short a;
+	unsigned short a;
 	unsigned char b;
 	unsigned char c;
 };
@@ -30,7 +31,7 @@ struct line2 {
 struct line3 {
 	unsigned char a;
 	unsigned char b;
-	short c;
+	unsigned short c;
 	
 };
 
@@ -64,97 +65,15 @@ tableEntry::tableEntry(string soIP, string nM, string nH){
 	netMask = nM;
 	nextHop = nH;
 }
+tableEntry bestMatch(vector<tableEntry>);
 
 
-
-class Node
-{ 
-	public:
-		char val; 
-		Node *children[300];
-		Node()
-		{
-			for (int i = 0; i < 300; i++)
-				children[i] = NULL;
-		}
-};
- 
-
-
-/* 								Trie implementation								 */
-
-
-
-class Trie
-{ 
-	private: 
-		Node *root;
-	public: 
-		string matchingPrefix;
-		vector<string> matchingPrefixes;
-
-		Trie() 
-		{ 
-			root = initNode(0);
-			matchingPrefix = "";
-		}
- 
-		Node* initNode(int val) 
-		{   
-			Node* initNode = new Node; 
-			initNode->val = val; 
-			return initNode; 
-		}
- 
-		void insert(string ipAdd) 
-		{ 
-			Node *curr = root; 
-			for (int i = 0; i < ipAdd.length(); i++)
-			{
-				if (!curr->children[ipAdd[i] - 'A']) 
-					curr->children[ipAdd[i] - 'A'] = initNode(ipAdd[i]);
-				curr = curr->children[ipAdd[i] - 'A']; 
-			}
-		}
- 
-		void createString(Node *curr, string ipAdd, int i) 
-		{ 
-			if (curr) 
-			{ 
-				matchingPrefix += curr->val; 
-				if (i < ipAdd.length()) 
-					createString(curr->children[ipAdd[i] - 'A'], ipAdd, i + 1); 
-			}
-		}
- 
-		void search(string ipAdd) 
-		{ 
-			if (root && ipAdd.length() > 0 ) 
-				createString(root->children[ipAdd[0] - 'A'], ipAdd, 1); 
-		
-		}
-};
-
-/* 								End trie implementation								 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/* Deleted code */
 
 int main(int argc, char *argv[]) {
 	FILE *fp;
 	fp = fopen ("./ip_packets", "rb");
-	//while (!feof(fp)){}
+	while (!feof(fp)){
 	line1 x;
 	/*												*/
 	
@@ -176,9 +95,9 @@ int main(int argc, char *argv[]) {
 
 
 	int TTL = z.a;
-	short checksum = z.c; // wrong, needs htons
-	long sourceIP;
-	long destIP;
+	unsigned short checksum = z.c; // wrong, needs htons
+	unsigned long sourceIP;
+	unsigned long destIP;
 
 	fread(&sourceIP, 4, 1, fp);
 	fread(&destIP, 4, 1, fp);
@@ -188,8 +107,18 @@ int main(int argc, char *argv[]) {
 	char *data;
 	data = NULL;
 	data = new char[total_len-20];
-	//fread(&data, total_len-20, 1, fp);
-	
+	fread(&data[0], 1, total_len-20, fp);
+	int n=total_len-20, i =0;
+	 char* byte_array = data;
+if( feof(fp) )
+	{
+	   break;
+	}
+	while (i < n)
+	{
+		 printf(" %d. = %02d | ",i+1,(unsigned)byte_array[i]);
+		 i++;
+	}
 	
 	/*    					ROUTING TABLE PARSING					*/
 	ifstream routingTable;
@@ -208,27 +137,40 @@ int main(int argc, char *argv[]) {
 	}
 	routingTable.close();
 	
-	int matchCounter = 0;
 	
 	//cout << "TESTING: " << longToDottedIP(destIP) << endl;
 	//prefixtree.search("137.34");
-	long currSmallest = reverseLong(inet_addr(routingEntries[0].getSourceIP().c_str())) ^ destIP;
-	
+	bool matchFound = false;	
+	string forwardedIP = "";
+	vector<tableEntry> matchList;
 	
 	for (int i = 0; i <routingEntries.size()-1; i++) {
 		//long testValue = reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str())) ^ destIP & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str()));
 		long testValue = reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) ^ destIP & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str()));
-		cout << endl;
+		
+		
+		/*cout << endl;
 		cout << reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) << endl;
 		cout << reverseLong(inet_addr(routingEntries[i].getnetMask().c_str())) << endl;
-		cout << destIP << endl;
+		cout << destIP << endl;*/
 		
-		cout << "testval: " << testValue << endl;
-		if (testValue ==0){
-			matchCounter+=1;
-			
-			cout << "Matching: " << routingEntries[i].getSourceIP() << endl;
+		
+		//cout << "testval: " << testValue << endl;
+		if (testValue == 0){
+			matchFound = true;
+			matchList.push_back(routingEntries[i]);
+			forwardedIP = routingEntries[i].getnextHop();
+			//cout << "Matching: " << routingEntries[i].getSourceIP() << endl;
 		}
+		
+	
+	}
+	if (matchFound) {
+		forwardedIP = bestMatch(matchList).getnextHop();
+	}
+	else {
+		forwardedIP = routingEntries[routingEntries.size()-1].getSourceIP();
+
 	}
 	
 	
@@ -241,9 +183,9 @@ int main(int argc, char *argv[]) {
 	
 	//								TESTING PRINT FOR ROUTING TABLE                      //
 	
-	for (int i = 0; i < routingEntries.size(); i++){
+	/*for (int i = 0; i < routingEntries.size(); i++){
 		cout << routingEntries[i].getSourceIP() << " " << routingEntries[i].getnetMask() << " " << routingEntries[i].getnextHop() << " " << endl;
-	}
+	}*/
 	
 	
 	/*long checksumArray[10] = [(x.a << 8) | (x.b), 
@@ -261,20 +203,20 @@ int main(int argc, char *argv[]) {
 	
 	
 	
-	long mynum = (x.a << 8) | (x.b);
-	long mynum2 = (x.c << 8) | (x.d);
-	long mynum3 = htons((y.a));
-	long mynum4 = (y.b << 8) | (y.b);
-	long mynum5 = (z.a << 8) | (z.b);
-	long mynum6 = htons((z.c));
-	long mynum7 = (sourceIP & 0xffff0000) >> 16;
-	long mynum8 = (sourceIP & 0x0000ffff);
-	long mynum9 = (destIP & 0xffff0000) >> 16;
-	long mynum10 = (destIP & 0x0000ffff);
+	unsigned long mynum = (x.a << 8) | (x.b);
+	unsigned long mynum2 = (x.c << 8) | (x.d);
+	unsigned long mynum3 = htons((y.a));
+	unsigned long mynum4 = (y.b << 8) | (y.b);
+	unsigned long mynum5 = (z.a << 8) | (z.b);
+	unsigned long mynum6 = htons((z.c));
+	unsigned long mynum7 = (sourceIP & 0xffff0000) >> 16;
+	unsigned long mynum8 = (sourceIP & 0x0000ffff);
+	unsigned long mynum9 = (destIP & 0xffff0000) >> 16;
+	unsigned long mynum10 = (destIP & 0x0000ffff);
 	
 
 
-	vector<long> nums;
+	vector<unsigned long> nums;
 	nums.push_back(mynum);
 	nums.push_back(mynum2);
 	nums.push_back(mynum3);
@@ -286,27 +228,25 @@ int main(int argc, char *argv[]) {
 	nums.push_back(mynum9);
 	nums.push_back(mynum10);
 
-	long sum = 0;
+	unsigned long sum = 0;
 	int j = 1;
 
-	for (int i = 0; i < nums.size(); i+=2) {
-		//cout << "NUM: " << i+1 << " " << nums[i] << endl;
-		//cout << "NUM: " << j+1 << " " << nums[j] << endl;
+	for (int i = 0; i < nums.size(); i+=1) {
+		cout << "NUM: " << i+1 << " " << nums[i] << endl;
+		cout << "NUM: " << j+1 << " " << nums[j] << endl;
 
-		if (sum + nums[i] + nums[i+1] >= 65535) {
-			sum += (nums[i] + nums[i+1] - 65536 + 1);
+		if (sum + nums[i] >= 65535) {
+			sum += (nums[i] - 65536 + 1);
 		}
 		else {
-			sum += nums[i] + nums[i+1];
+			sum += nums[i];
  		}
-		j+=2;
+		//j+=2;
+	cout << "SUMCURR: " << sum << endl;
 	}
 		
 	
 	cout << "sum: " << sum << endl;
-	
-	//cout << "Checksum: " << ~mynum + ~mynum2 + ~mynum3 + ~mynum4 + ~mynum5 + ~mynum6 + ~mynum7 + ~mynum8 + ~mynum9 + ~mynum10  << endl;
-
 	
 	cout << version << endl;
 	cout << hlen << endl;
@@ -316,10 +256,11 @@ int main(int argc, char *argv[]) {
 	cout << checksum << endl;
 	cout << "SourceIP " << longToDottedIP(sourceIP) << endl;
 	cout << "DestIP " << longToDottedIP(destIP) << endl;
+	cout << "ForwardedIP " << forwardedIP << endl;
 
 	//cout << "Longest Matching: " << prefixtree.matchingPrefix << endl;
-	
-	
+	delete[] data;
+	}
 	
 	return 0;
 
@@ -365,5 +306,19 @@ long reverseLong(long num){
 	return swapped;
 	/* Source: http://stackoverflow.com/questions/2182002/convert-big-endian-to-little-endian-in-c-without-using-provided-func */
 	
+}
+
+tableEntry bestMatch(vector<tableEntry> matchList) {
+	long currLargest = reverseLong(inet_addr(matchList[0].getnetMask().c_str()));
+	tableEntry currLargestEntry = matchList[0];
+	
+	for (int i = 0; i < matchList.size(); i++) {
+		if (reverseLong(inet_addr(matchList[i].getnetMask().c_str())) > currLargest) {
+			currLargest = reverseLong(inet_addr(matchList[i].getnetMask().c_str()));
+			currLargestEntry = matchList[i];
+		}
+	}
+	
+	return currLargestEntry;
 }
 
