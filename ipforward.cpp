@@ -82,8 +82,7 @@ int main(int argc, char *argv[]) {
 	int version = (x.a & 0xF0) >> 4;
 	int hlen = (x.a & 0x0F) * 4;
 	int total_len = x.c * 256 + x.d;
-	
-	
+
 	line2 y;
 	
 	fread(&y.a, 4, 1, fp);
@@ -114,11 +113,11 @@ if( feof(fp) )
 	{
 	   break;
 	}
-	while (i < n)
+	/*while (i < n)
 	{
 		 printf(" %d. = %02d | ",i+1,(unsigned)byte_array[i]);
 		 i++;
-	}
+	}*/
 	
 	/*    					ROUTING TABLE PARSING					*/
 	ifstream routingTable;
@@ -186,22 +185,7 @@ if( feof(fp) )
 	/*for (int i = 0; i < routingEntries.size(); i++){
 		cout << routingEntries[i].getSourceIP() << " " << routingEntries[i].getnetMask() << " " << routingEntries[i].getnextHop() << " " << endl;
 	}*/
-	
-	
-	/*long checksumArray[10] = [(x.a << 8) | (x.b), 
-	(x.c << 8) | (x.d), 
-	htons((y.a)), 
-	(y.b << 8) | (y.b), 
-	(z.a << 8) | (z.b),
-	htons((z.c)),
-	sourceIP & 0xffff0000) >> 16,
-	(sourceIP & 0x0000ffff),
-	(destIP & 0xffff0000) >> 16,
-	(destIP & 0x0000ffff)
-	];*/
-	
-	
-	
+		
 	
 	unsigned long mynum = (x.a << 8) | (x.b);
 	unsigned long mynum2 = (x.c << 8) | (x.d);
@@ -229,20 +213,15 @@ if( feof(fp) )
 	nums.push_back(mynum10);
 
 	unsigned long sum = 0;
-	int j = 1;
 
 	for (int i = 0; i < nums.size(); i+=1) {
-		cout << "NUM: " << i+1 << " " << nums[i] << endl;
-		cout << "NUM: " << j+1 << " " << nums[j] << endl;
-
+	
 		if (sum + nums[i] >= 65535) {
 			sum += (nums[i] - 65536 + 1);
 		}
 		else {
 			sum += nums[i];
  		}
-		//j+=2;
-	cout << "SUMCURR: " << sum << endl;
 	}
 		
 	
