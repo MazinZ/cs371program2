@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <ostream>
 
 using namespace std;
 
@@ -13,7 +14,8 @@ string longToDottedIP(long ip);
 vector<string> parser(string s);
 bool matchesPrefix(string prefix, string ipAdd);
 long reverseLong(long num);
-
+bool validChecksum(vector<unsigned long> wordList);
+unsigned long recalculateChecksum(vector<unsigned long> wordList, unsigned long newTTLword);
 
 struct line1 {
 	unsigned char a;
@@ -68,63 +70,21 @@ tableEntry::tableEntry(string soIP, string nM, string nH){
 tableEntry bestMatch(vector<tableEntry>);
 
 
-/* Deleted code */
 
 int main(int argc, char *argv[]) {
-	FILE *fp;
-	fp = fopen ("./ip_packets", "rb");
-	while (!feof(fp)){
-	line1 x;
-	/*												*/
 	
-	
-	fread(&x.a, 4, 1, fp);
-	int version = (x.a & 0xF0) >> 4;
-	int hlen = (x.a & 0x0F) * 4;
-	int total_len = x.c * 256 + x.d;
-
-	line2 y;
-	
-	fread(&y.a, 4, 1, fp);
-	int identifier = y.a;
-	
-	
-	line3 z;
-	fread(&z, 4, 1, fp);
-
-
-	int TTL = z.a;
-	unsigned short checksum = z.c; // wrong, needs htons
-	unsigned long sourceIP;
-	unsigned long destIP;
-
-	fread(&sourceIP, 4, 1, fp);
-	fread(&destIP, 4, 1, fp);
-	sourceIP = htonl(sourceIP);
-	destIP = htonl(destIP);
-	
-	char *data;
-	data = NULL;
-	data = new char[total_len-20];
-	fread(&data[0], 1, total_len-20, fp);
-	int n=total_len-20, i =0;
-	 char* byte_array = data;
-if( feof(fp) )
-	{
-	   break;
-	}
-	/*while (i < n)
-	{
-		 printf(" %d. = %02d | ",i+1,(unsigned)byte_array[i]);
-		 i++;
-	}*/
+	int packetCounter = 1;
+	//ofstream outputFile (“ip_packets_out”,ios::binary);
+  	 ofstream ofs ( "ip_packets_out", ios_base::binary );
 	
 	/*    					ROUTING TABLE PARSING					*/
+
 	ifstream routingTable;
 	routingTable.open("./routing_table.txt", ifstream::in);
 	string line;
 	vector<tableEntry> routingEntries;
-	//Trie prefixtree;
+	
+	
 	while (getline(routingTable, line))
 	{
 		
@@ -132,114 +92,131 @@ if( feof(fp) )
 		parsed = parser(line);
 		tableEntry newTableEntry(parsed[0], parsed[1], parsed[2]);
 		routingEntries.push_back(newTableEntry);
-		//prefixtree.insert(parsed[0].substr(0, parsed[0].find_first_of(".0")+1));
 	}
 	routingTable.close();
 	
+	FILE *fp;
+	fp = fopen ("./ip_packets", "rb");
+	while (true){
+		line1 x;
+	/*												*/
 	
-	//cout << "TESTING: " << longToDottedIP(destIP) << endl;
-	//prefixtree.search("137.34");
-	bool matchFound = false;	
-	string forwardedIP = "";
-	vector<tableEntry> matchList;
 	
-	for (int i = 0; i <routingEntries.size()-1; i++) {
-		//long testValue = reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str())) ^ destIP & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str()));
-		long testValue = reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) ^ destIP & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str()));
-		
-		
-		/*cout << endl;
-		cout << reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) << endl;
-		cout << reverseLong(inet_addr(routingEntries[i].getnetMask().c_str())) << endl;
-		cout << destIP << endl;*/
-		
-		
-		//cout << "testval: " << testValue << endl;
-		if (testValue == 0){
-			matchFound = true;
-			matchList.push_back(routingEntries[i]);
-			forwardedIP = routingEntries[i].getnextHop();
-			//cout << "Matching: " << routingEntries[i].getSourceIP() << endl;
-		}
-		
-	
-	}
-	if (matchFound) {
-		forwardedIP = bestMatch(matchList).getnextHop();
-	}
-	else {
-		forwardedIP = routingEntries[routingEntries.size()-1].getSourceIP();
+		fread(&x.a, 4, 1, fp);
+		int version = (x.a & 0xF0) >> 4;
+		int hlen = (x.a & 0x0F) * 4;
+		int total_len = x.c * 256 + x.d;
 
-	}
+		line2 y;
+	
+		fread(&y.a, 4, 1, fp);
+		int identifier = y.a;
+	
+	
+		line3 z;
+		fread(&z, 4, 1, fp);
+
+
+		int TTL = z.a;
+		unsigned short checksum = z.c; // wrong, needs htons
+		unsigned long sourceIP;
+		unsigned long destIP;
+
+		fread(&sourceIP, 4, 1, fp);
+		fread(&destIP, 4, 1, fp);
+		sourceIP = htonl(sourceIP);
+		destIP = htonl(destIP);
+	
+		char *data;
+		data = NULL;
+		data = new char[total_len-20];
+		fread(&data[0], 1, total_len-20, fp);
+		int n=total_len-20, i =0;
+
+
+		if( feof(fp) ){
+	   		break;
+		}	
+	
+	
+	
+		bool matchFound = false;	
+		string forwardedIP = "";
+		vector<tableEntry> matchList;
+	
+		for (int i = 0; i <routingEntries.size()-1; i++) {
+	
+			long testValue = reverseLong(inet_addr(routingEntries[i].getSourceIP().c_str())) ^ destIP & reverseLong(inet_addr(routingEntries[i].getnetMask().c_str()));
+		
+		
+			if (testValue == 0){
+				matchFound = true;
+				matchList.push_back(routingEntries[i]);
+				forwardedIP = routingEntries[i].getnextHop();
+			}
+		
+	
+		}
+		if (matchFound) {
+			forwardedIP = bestMatch(matchList).getnextHop();
+		}
+		else {
+		forwardedIP = routingEntries[routingEntries.size()-1].getSourceIP();
+		}
 	
 	
 	/*						OUTPUT FILE 							*/
 	
-	
-	
-	
-	
-	
-	//								TESTING PRINT FOR ROUTING TABLE                      //
-	
-	/*for (int i = 0; i < routingEntries.size(); i++){
-		cout << routingEntries[i].getSourceIP() << " " << routingEntries[i].getnetMask() << " " << routingEntries[i].getnextHop() << " " << endl;
-	}*/
+
+
+		unsigned long word1 = (x.a << 8) | (x.b);
+		unsigned long word2 = (x.c << 8) | (x.d);
+		unsigned long word3 = htons((y.a));
+		unsigned long word4 = (y.b << 8) | (y.b);
+		unsigned long word5 = (z.a << 8) | (z.b);
+		unsigned long long1 = (z.a - 1) | (z.b);
+	/*	unsigned long test = TTL;
+cout <<"Z: " << test << endl;*/
+
+		unsigned long word6 = htons((z.c));
+		unsigned long word7 = (sourceIP & 0xffff0000) >> 16;
+		unsigned long word8 = (sourceIP & 0x0000ffff);
+		unsigned long word9 = (destIP & 0xffff0000) >> 16;
+		unsigned long word10 = (destIP & 0x0000ffff);
 		
-	
-	unsigned long mynum = (x.a << 8) | (x.b);
-	unsigned long mynum2 = (x.c << 8) | (x.d);
-	unsigned long mynum3 = htons((y.a));
-	unsigned long mynum4 = (y.b << 8) | (y.b);
-	unsigned long mynum5 = (z.a << 8) | (z.b);
-	unsigned long mynum6 = htons((z.c));
-	unsigned long mynum7 = (sourceIP & 0xffff0000) >> 16;
-	unsigned long mynum8 = (sourceIP & 0x0000ffff);
-	unsigned long mynum9 = (destIP & 0xffff0000) >> 16;
-	unsigned long mynum10 = (destIP & 0x0000ffff);
-	
 
 
-	vector<unsigned long> nums;
-	nums.push_back(mynum);
-	nums.push_back(mynum2);
-	nums.push_back(mynum3);
-	nums.push_back(mynum4);
-	nums.push_back(mynum5);
-	nums.push_back(mynum6);
-	nums.push_back(mynum7);
-		nums.push_back(mynum8);
-	nums.push_back(mynum9);
-	nums.push_back(mynum10);
-
-	unsigned long sum = 0;
-
-	for (int i = 0; i < nums.size(); i+=1) {
-	
-		if (sum + nums[i] >= 65535) {
-			sum += (nums[i] - 65536 + 1);
+		vector<unsigned long> wordList;
+		wordList.push_back(word1);
+		wordList.push_back(word2);
+		wordList.push_back(word3);
+		wordList.push_back(word4);
+		wordList.push_back(word5);
+		wordList.push_back(word6);
+		wordList.push_back(word7);
+		wordList.push_back(word8);
+		wordList.push_back(word9);
+		wordList.push_back(word10);
+			
+		if (TTL - 1 == 0 || TTL == 0) {
+			cout << "Packet #" << packetCounter << ": Dropped because TTL becomes 0." << endl;
+			packetCounter+=1;
+			continue;
 		}
-		else {
-			sum += nums[i];
- 		}
-	}
-		
-	
-	cout << "sum: " << sum << endl;
-	
-	cout << version << endl;
-	cout << hlen << endl;
-	cout << total_len << endl;
-	cout << identifier << endl;
-	cout << TTL << endl;
-	cout << checksum << endl;
-	cout << "SourceIP " << longToDottedIP(sourceIP) << endl;
-	cout << "DestIP " << longToDottedIP(destIP) << endl;
-	cout << "ForwardedIP " << forwardedIP << endl;
 
-	//cout << "Longest Matching: " << prefixtree.matchingPrefix << endl;
-	delete[] data;
-	}
+		if (!validChecksum(wordList)) {
+			cout << "Packet #" << packetCounter << ": Dropped because of incorrect checksum." << endl;
+			packetCounter+=1;
+
+			continue;
+		}
+		cout << "Packet #" << packetCounter << ": Forwarded to " << forwardedIP << endl;
+		
+		packetCounter+=1;
+		unsigned short newChecksum = recalculateChecksum(wordList, (z.a - 1) << 8 | (z.b));
+		cout << newChecksum<< endl;
+		delete[] data;
+		}
 	
 	return 0;
 
@@ -271,11 +248,7 @@ vector<string> parser(string s) {
 }
 
 
-/*bool matchesPrefix(string prefix, string ipAdd) {
-	
-	
-}
-*/
+
 long reverseLong(long num){
 	long swapped = ((num>>24)&0xff) | // move byte 3 to byte 0
 	((num<<8)&0xff0000) | // move byte 1 to byte 2
@@ -301,3 +274,50 @@ tableEntry bestMatch(vector<tableEntry> matchList) {
 	return currLargestEntry;
 }
 
+
+bool validChecksum(vector<unsigned long> wordList) {
+	unsigned long sum = 0;
+
+	for (int i = 0; i < wordList.size(); i+=1) {
+	
+		if (sum + wordList[i] >= 65535) {
+			sum += (wordList[i] - 65536 + 1);
+		}
+		else {
+			sum += wordList[i];
+ 		}
+	}
+	
+	if (sum == 0) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+unsigned long recalculateChecksum(vector<unsigned long> wordList, unsigned long newTTLword) {
+	unsigned long sum = 0;
+	wordList[4] = newTTLword;
+	
+	//cout << "TEST " << newTTLword << endl;
+	//cout << newTTLword << endl;
+	for (int i = 0; i < wordList.size(); i+=1) {
+			//cout << " i = " << i+1 << "WORDLIST: " << wordList[i] << endl;
+			if (i == 5){
+				continue;
+				
+			}
+			
+			if (sum + wordList[i] >= 65535) {
+				sum += (wordList[i] - 65536 + 1);
+			}
+			else {
+				sum += wordList[i];
+	 		}
+	
+		}
+		
+		return ~sum;
+	
+}
